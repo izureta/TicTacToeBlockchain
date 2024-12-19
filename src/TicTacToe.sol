@@ -67,3 +67,16 @@ contract TicTacToe {
         return address(0);
     }
 }
+
+contract TicTacToeFactory {
+    address[] public games;
+
+    function createGame(address _player1, address _player2) external {
+        TicTacToe newGame = new TicTacToe(_player1, _player2);
+        games.push(address(newGame));
+    }
+
+    function getGames() external view returns (address[] memory) {
+        return games;
+    }
+}
