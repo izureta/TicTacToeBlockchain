@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tic Tac Toe</title>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <h1>Tic Tac Toe</h1>
+    <div id="board">
+        <div class="row">
+            <div class="cell" data-x="0" data-y="0"></div>
+            <div class="cell" data-x="0" data-y="1"></div>
+            <div class="cell" data-x="0" data-y="2"></div>
+        </div>
+        <div class="row">
+            <div class="cell" data-x="1" data-y="0"></div>
+            <div class="cell" data-x="1" data-y="1"></div>
+            <div class="cell" data-x="1" data-y="2"></div>
+        </div>
+        <div class="row">
+            <div class="cell" data-x="2" data-y="0"></div>
+            <div class="cell" data-x="2" data-y="1"></div>
+            <div class="cell" data-x="2" data-y="2"></div>
+        </div>
+    </div>
+    <h2 id="status">Waiting for player move...</h2>
+    <script type="module">
+        import { ethers } from "./ethers.js/dist/ethers.min.js";
+
+        const contractAddress = '0xa4Ad9c1a462A72EB2Dc807ffb9B51DaFb1E5576A';
+        const contractABI = [{"type":"constructor","inputs":[{"name":"_player2","type":"address","internalType":"address"}],"stateMutability":"nonpayable"},{"type":"function","name":"board","inputs":[{"name":"","type":"uint256","internalType":"uint256"},{"name":"","type":"uint256","internalType":"uint256"}],"outputs":[{"name":"","type":"uint8","internalType":"uint8"}],"stateMutability":"view"},{"type":"function","name":"checkWinner","inputs":[],"outputs":[{"name":"","type":"address","internalType":"address"}],"stateMutability":"view"},{"type":"function","name":"currentPlayer","inputs":[],"outputs":[{"name":"","type":"address","internalType":"address"}],"stateMutability":"view"},{"type":"function","name":"makeMove","inputs":[{"name":"x","type":"uint8","internalType":"uint8"},{"name":"y","type":"uint8","internalType":"uint8"}],"outputs":[],"stateMutability":"nonpayable"},{"type":"function","name":"player1","inputs":[],"outputs":[{"name":"","type":"address","internalType":"address"}],"stateMutability":"view"},{"type":"function","name":"player2","inputs":[],"outputs":[{"name":"","type":"address","internalType":"address"}],"stateMutability":"view"},{"type":"function","name":"turn","inputs":[],"outputs":[{"name":"","type":"uint8","internalType":"uint8"}],"stateMutability":"view"}];
+
+        async function initialize() {
+            if (window.ethereum) {
+                await ethereum.request({ method: 'eth_requestAccounts' });
+                window.provider = new ethers.BrowserProvider(window.ethereum);
+                window.signer = await provider.getSigner();
+                window.contract = new ethers.Contract(contractAddress, contractABI, signer);
+            } else {
+                alert('Please install MetaMask!');
+            }
+        }
+
+        async function getCurrentPlayer() {
+            const currentPlayer = await contract.currentPlayer();
+            return currentPlayer;
+        }
+
+        async function updateBoard() {
+            
+            let boardData = Array.from({ length: 3 }, () => Array(3).fill(0));
+            try {
+                for (let x = 0; x < 3; x++) {
+                    for (let y = 0; y < 3; y++) {
+                        const value = await contract.board(x, y);
+                        boardData[x][y] = value;
+                    }
+                }
+            } catch (error) {
+                console.error('Error fetching board state:', error);
+            }
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach((cell, index) => {
+                const x = Math.floor(index / 3);
+                const y = index % 3;
+                const value = boardData[x][y];
+                cell.textContent = value === 1n ? 'X' : (value === 2n ? 'O' : '');
+            });
+
+            const winner = await contract.checkWinner();
+            if (winner !== '0x0000000000000000000000000000000000000000') {
+                const playerAddress = await signer.getAddress();
+                if (winner.toLowerCase() === playerAddress.toLowerCase()) {
+                    document.getElementById('status').textContent = 'You are the winner!';
+                } else {
+                    document.getElementById('status').textContent = 'The opponent won!';
+                }
+            } else {
+                document.getElementById('status').textContent = 'Waiting for player move...';
+            }
+        }
+
+        async function makeMove(x, y) {
+            const currentPlayer = await getCurrentPlayer();
+            const playerAddress = await signer.getAddress();
+        
+            if (currentPlayer !== playerAddress) {
+                alert('Not your turn! It`s turn for ' + currentPlayer + ' and you are ' + playerAddress);
+                return;
+            }
+        
+            try {
+                const tx = await contract.makeMove(x, y);
+                await tx.wait();
+                updateBoard();
+            } catch (error) {
+                console.error(error);
+            }
+        }
+
+        document.addEventListener('DOMContentLoaded', async () => {
+            await initialize();
+            await updateBoard();
+
+            const cells = document.querySelectorAll('.cell');
+            cells.forEach(cell => {
+                cell.addEventListener('click', async () => {
+                    const x = cell.getAttribute('data-x');
+                    const y = cell.getAttribute('data-y');
+                    await makeMove(x, y);
+                    await updateBoard();
+                });
+            });
+        });
+    </script>
+</body>
+</html>
